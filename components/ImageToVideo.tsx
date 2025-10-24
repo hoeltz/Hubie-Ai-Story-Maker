@@ -1,10 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { generateVideoFromImage, fileToGenerativePart } from '../services/geminiService';
 import Spinner from './Spinner';
 import { UploadIcon } from './icons/UploadIcon';
 import { VideoIcon } from './icons/VideoIcon';
-import ApiKeySelector from './ApiKeySelector';
 
 const POLLING_MESSAGES = [
   "Warming up the digital director's chair...",
@@ -16,9 +14,11 @@ const POLLING_MESSAGES = [
   "Almost there, adding the final touches..."
 ];
 
-const ImageToVideo: React.FC = () => {
-  const [apiKeyStatus, setApiKeyStatus] = useState<'checking' | 'present' | 'missing'>('checking');
-  const [isApiKeyError, setIsApiKeyError] = useState<boolean>(false);
+interface ImageToVideoProps {
+  onApiKeyError: () => void;
+}
+
+const ImageToVideo: React.FC<ImageToVideoProps> = ({ onApiKeyError }) => {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [prompt, setPrompt] = useState<string>('Animate this image with subtle motion, like a gentle breeze.');
@@ -26,18 +26,6 @@ const ImageToVideo: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [pollingMessage, setPollingMessage] = useState(POLLING_MESSAGES[0]);
-
-  useEffect(() => {
-    const checkApiKey = async () => {
-      if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
-        const hasKey = await window.aistudio.hasSelectedApiKey();
-        setApiKeyStatus(hasKey ? 'present' : 'missing');
-      } else {
-        setApiKeyStatus('present');
-      }
-    };
-    checkApiKey();
-  }, []);
 
   useEffect(() => {
     let interval: number;
@@ -83,9 +71,9 @@ const ImageToVideo: React.FC = () => {
       setVideoUrl(resultUrl);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
+      // Jika kita mendapatkan kesalahan kunci/proyek tertentu, panggil callback untuk menampilkan pemilih global
       if (errorMessage.includes("Requested entity was not found")) {
-        setApiKeyStatus('missing');
-        setIsApiKeyError(true);
+        onApiKeyError();
       } else {
         setError(errorMessage);
       }
@@ -94,29 +82,6 @@ const ImageToVideo: React.FC = () => {
       setIsLoading(false);
     }
   };
-  
-  const handleKeySelected = () => {
-    setApiKeyStatus('present');
-    setIsApiKeyError(false);
-    setError(null);
-  };
-
-  if (apiKeyStatus === 'checking') {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <Spinner />
-      </div>
-    );
-  }
-
-  if (apiKeyStatus === 'missing') {
-    return (
-      <ApiKeySelector 
-        onKeySelected={handleKeySelected} 
-        isErrorState={isApiKeyError} 
-      />
-    );
-  }
 
   return (
     <div className="flex flex-col h-full">

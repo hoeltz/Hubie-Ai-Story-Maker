@@ -3,19 +3,26 @@ import TabButton from './TabButton';
 import StoryGenerator from './StoryGenerator';
 import ImageToText from './ImageToText';
 import TextToVoice from './TextToVoice';
+import ImageToVideo from './ImageToVideo';
 import { BookOpenIcon } from './icons/BookOpenIcon';
 import { EyeIcon } from './icons/EyeIcon';
 import { VolumeIcon } from './icons/VolumeIcon';
+import { VideoIcon } from './icons/VideoIcon';
 
-type Tab = 'story' | 'image' | 'voice';
+type Tab = 'story' | 'image' | 'voice' | 'video';
+
+interface WorkflowManagerProps {
+  onApiKeyError: () => void;
+}
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'story', label: 'Story Generator', icon: <BookOpenIcon className="w-5 h-5"/> },
     { id: 'image', label: 'Image to Text', icon: <EyeIcon className="w-5 h-5" /> },
     { id: 'voice', label: 'Text to Voice', icon: <VolumeIcon className="w-5 h-5" /> },
+    { id: 'video', label: 'Image to Video', icon: <VideoIcon className="w-5 h-5" /> },
 ];
 
-const WorkflowManager: React.FC = () => {
+const WorkflowManager: React.FC<WorkflowManagerProps> = ({ onApiKeyError }) => {
   const [activeTab, setActiveTab] = useState<Tab>('story');
 
   const renderActiveTab = () => {
@@ -26,6 +33,9 @@ const WorkflowManager: React.FC = () => {
         return <ImageToText />;
       case 'voice':
         return <TextToVoice />;
+      case 'video':
+        // Teruskan penangan kesalahan ke bawah
+        return <ImageToVideo onApiKeyError={onApiKeyError} />;
       default:
         return null;
     }
