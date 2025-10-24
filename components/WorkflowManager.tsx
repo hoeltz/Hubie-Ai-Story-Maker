@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import TabButton from './TabButton';
 import StoryGenerator from './StoryGenerator';
@@ -23,13 +24,18 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'video', label: 'Image to Video', icon: <VideoIcon className="w-5 h-5" /> },
 ];
 
+// FIX: The error "Subsequent property declarations must have the same type" indicates a conflict
+// between multiple declarations of `window.aistudio`. Using a named interface `AIStudio`
+// instead of an anonymous type allows TypeScript to correctly merge the declarations.
+interface AIStudio {
+  hasSelectedApiKey: () => Promise<boolean>;
+  openSelectKey: () => Promise<void>;
+}
+
 // Add type definition for aistudio to avoid TypeScript errors.
 declare global {
   interface Window {
-    aistudio?: {
-      hasSelectedApiKey: () => Promise<boolean>;
-      openSelectKey: () => Promise<void>;
-    }
+    aistudio?: AIStudio;
   }
 }
 
