@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Modality, Type, Part } from "@google/genai";
 import { ProjectPlan, Scene } from "../types";
 
@@ -218,10 +219,8 @@ export const generateTextFromImage = async (prompt: string, image: Part): Promis
     return response.text;
 };
 
-// FIX: Added 'generateVideoFromImage' function to support the Image-to-Video feature.
 export const generateVideoFromImage = async (prompt: string, image: Part): Promise<string> => {
-    // Per Veo guidelines, create a new instance right before the API call
-    // to ensure the latest API key from the selection dialog is used.
+    // Create a new instance right before the API call to ensure it uses the latest API key.
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     if (!image.inlineData) {
@@ -269,9 +268,10 @@ export const generateVideoFromImage = async (prompt: string, image: Part): Promi
     if (!videoResponse.ok) {
         const errorBody = await videoResponse.text();
         console.error("Failed to download video from URI.", { status: videoResponse.status, body: errorBody });
-        // This is a key part of the error handling for API key setup issues
+        // A common error is "Requested entity was not found," which can indicate an issue with the
+        // project setup (e.g., billing not enabled or API not enabled).
         if (errorBody.includes("Requested entity was not found")) {
-            throw new Error("Requested entity was not found. This often means the Google Cloud project is not configured correctly. Please ensure billing is enabled and the 'Generative Language API' is active for your project.");
+            throw new Error("API request failed: 'Requested entity was not found'. This may be due to an incorrect project configuration. Please ensure billing is enabled and the 'Generative Language API' is active for your project.");
         }
         throw new Error(`Failed to download the generated video. Status: ${videoResponse.status}`);
     }
