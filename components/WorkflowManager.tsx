@@ -1,8 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import TabButton from './TabButton';
 import StoryGenerator from './StoryGenerator';
 import ImageToText from './ImageToText';
 import TextToVoice from './TextToVoice';
+// FIX: Import ImageToVideo, ApiKeySelector, and VideoIcon to integrate the new feature.
 import ImageToVideo from './ImageToVideo';
 import ApiKeySelector from './ApiKeySelector';
 import { BookOpenIcon } from './icons/BookOpenIcon';
@@ -10,64 +12,57 @@ import { EyeIcon } from './icons/EyeIcon';
 import { VolumeIcon } from './icons/VolumeIcon';
 import { VideoIcon } from './icons/VideoIcon';
 
+// FIX: Add 'video' to the Tab type definition.
+type Tab = 'story' | 'image' | 'voice' | 'video';
+
+// FIX: Add the new 'Image to Video' tab configuration.
+const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
+    { id: 'story', label: 'Story Generator', icon: <BookOpenIcon className="w-5 h-5"/> },
+    { id: 'image', label: 'Image to Text', icon: <EyeIcon className="w-5 h-5" /> },
+    { id: 'voice', label: 'Text to Voice', icon: <VolumeIcon className="w-5 h-5" /> },
+    { id: 'video', label: 'Image to Video', icon: <VideoIcon className="w-5 h-5" /> },
+];
+
+// Add type definition for aistudio to avoid TypeScript errors.
 declare global {
   interface Window {
     aistudio?: {
       hasSelectedApiKey: () => Promise<boolean>;
       openSelectKey: () => Promise<void>;
-    };
+    }
   }
 }
 
-type Tab = 'story' | 'image' | 'video' | 'voice';
-
-const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
-    { id: 'story', label: 'Story Generator', icon: <BookOpenIcon className="w-5 h-5"/> },
-    { id: 'image', label: 'Image to Text', icon: <EyeIcon className="w-5 h-5" /> },
-    { id: 'video', label: 'Image to Video', icon: <VideoIcon className="w-5 h-5" /> },
-    { id: 'voice', label: 'Text to Voice', icon: <VolumeIcon className="w-5 h-5" /> },
-];
-
 const WorkflowManager: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('story');
+  // FIX: Add state to manage the API key requirement for the video feature.
+  const [hasApiKeyForVideo, setHasApiKeyForVideo] = useState<boolean>(false);
+  const [apiKeyError, setApiKeyError] = useState<boolean>(false);
 
-  // State for video feature's API key requirement
-  const [videoTabNeedsKey, setVideoTabNeedsKey] = useState(false);
-  const [isApiKeyError, setIsApiKeyError] = useState(false);
-
+  // FIX: Add an effect to check for the API key when the video tab is selected.
   useEffect(() => {
-    const checkApiKeyRequirement = async () => {
-      if (activeTab === 'video') {
-        if (window.aistudio?.hasSelectedApiKey) {
-          try {
-            const hasKey = await window.aistudio.hasSelectedApiKey();
-            setVideoTabNeedsKey(!hasKey);
-            if (hasKey) {
-              setIsApiKeyError(false); // Reset error state if key exists
+    const checkApiKey = async () => {
+        if (activeTab === 'video') {
+            if (window.aistudio && await window.aistudio.hasSelectedApiKey()) {
+                setHasApiKeyForVideo(true);
+                setApiKeyError(false); // Reset error state on successful check
+            } else {
+                setHasApiKeyForVideo(false);
             }
-          } catch (e) {
-            console.error("Error checking for API key:", e);
-            setVideoTabNeedsKey(true);
-          }
-        } else {
-          // If aistudio is not available, video generation will fail, so prompt for key.
-          setVideoTabNeedsKey(true);
         }
-      } else {
-        setVideoTabNeedsKey(false);
-      }
     };
-    checkApiKeyRequirement();
+    checkApiKey();
   }, [activeTab]);
-
+  
   const handleKeySelected = () => {
-    setVideoTabNeedsKey(false);
-    setIsApiKeyError(false);
+    // Assume selection was successful. A failed API call will trigger the error state.
+    setHasApiKeyForVideo(true);
+    setApiKeyError(false);
   };
   
   const handleApiKeyError = () => {
-    setVideoTabNeedsKey(true);
-    setIsApiKeyError(true);
+    setHasApiKeyForVideo(false);
+    setApiKeyError(true);
   };
 
   const renderActiveTab = () => {
@@ -76,13 +71,14 @@ const WorkflowManager: React.FC = () => {
         return <StoryGenerator />;
       case 'image':
         return <ImageToText />;
-      case 'video':
-        if (videoTabNeedsKey) {
-            return <ApiKeySelector onKeySelected={handleKeySelected} isErrorState={isApiKeyError} />;
-        }
-        return <ImageToVideo onApiKeyError={handleApiKeyError} />;
       case 'voice':
         return <TextToVoice />;
+      // FIX: Add rendering logic for the new video tab, including the API key check.
+      case 'video':
+        if (!hasApiKeyForVideo) {
+          return <ApiKeySelector onKeySelected={handleKeySelected} isErrorState={apiKeyError} />;
+        }
+        return <ImageToVideo onApiKeyError={handleApiKeyError} />;
       default:
         return null;
     }

@@ -1,6 +1,9 @@
 
 
 
+
+
+
 import { GoogleGenAI, Modality, Type, Part } from "@google/genai";
 import { ProjectPlan, Scene } from "../types";
 
@@ -221,49 +224,53 @@ export const generateTextFromImage = async (prompt: string, image: Part): Promis
     return response.text;
 };
 
-// FIX: Add generateVideoFromImage function as it was missing.
+// FIX: Add the missing generateVideoFromImage function.
 export const generateVideoFromImage = async (prompt: string, image: Part): Promise<string> => {
-    if (!image.inlineData) {
-      throw new Error("Image data is missing for video generation.");
-    }
-    
+    // A new `GoogleGenAI` instance should be created before each call
+    // to ensure the latest API key from `aistudio` is used.
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
-    let operation = await ai.models.generateVideos({
-      model: 'veo-3.1-fast-generate-preview',
-      prompt: prompt,
-      image: {
-        imageBytes: image.inlineData.data,
-        mimeType: image.inlineData.mimeType,
-      },
-      config: {
-        numberOfVideos: 1,
-        resolution: '720p',
-        aspectRatio: '16:9'
-      }
-    });
-  
-    while (!operation.done) {
-      await new Promise(resolve => setTimeout(resolve, 10000)); // Polling every 10 seconds
-      operation = await ai.operations.getVideosOperation({operation: operation});
+
+    if (!image.inlineData) {
+        throw new Error("Invalid image part provided for video generation.");
     }
-  
+
+    let operation = await ai.models.generateVideos({
+        model: 'veo-3.1-fast-generate-preview',
+        prompt: prompt,
+        image: {
+            imageBytes: image.inlineData.data,
+            mimeType: image.inlineData.mimeType,
+        },
+        config: {
+            numberOfVideos: 1,
+            resolution: '720p',
+            aspectRatio: '16:9'
+        }
+    });
+
+    while (!operation.done) {
+        // Wait for 10 seconds before polling again, as per docs.
+        await new Promise(resolve => setTimeout(resolve, 10000));
+        operation = await ai.operations.getVideosOperation({ operation: operation });
+    }
+
     const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
     if (!downloadLink) {
-      console.error("Video generation failed. Full operation response:", JSON.stringify(operation, null, 2));
-      throw new Error("Video generation did not return a valid video link.");
+        console.error("Video generation finished but no download link was provided. Full response:", operation.response);
+        throw new Error("Video generation failed to return a valid download link.");
     }
-    
+
+    // The download link needs the API key appended.
     const response = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
     if (!response.ok) {
         const errorBody = await response.text();
-        console.error("Failed to download video file. Status:", response.status, "Body:", errorBody);
+        console.error("Failed to download video. Status:", response.status, "Body:", errorBody);
         throw new Error(`Failed to download video file: ${response.statusText}`);
     }
-  
+
     const videoBlob = await response.blob();
     return URL.createObjectURL(videoBlob);
-  };
+};
 
 export const generateSpeech = async (text: string, voiceName: string): Promise<string> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
