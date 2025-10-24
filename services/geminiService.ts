@@ -1,4 +1,5 @@
 
+
 import { GoogleGenAI, Modality, Type, Part } from "@google/genai";
 import { ProjectPlan, Scene } from "../types";
 
@@ -219,67 +220,6 @@ export const generateTextFromImage = async (prompt: string, image: Part): Promis
     return response.text;
 };
 
-export const generateVideoFromImage = async (prompt: string, image: Part): Promise<string> => {
-    // Create a new instance right before the API call to ensure it uses the latest API key.
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    
-    if (!image.inlineData) {
-        throw new Error("Invalid image part provided for video generation.");
-    }
-
-    const imagePayload = {
-        imageBytes: image.inlineData.data,
-        mimeType: image.inlineData.mimeType,
-    };
-
-    let operation = await ai.models.generateVideos({
-        model: 'veo-3.1-fast-generate-preview',
-        prompt: prompt,
-        image: imagePayload,
-        config: {
-            numberOfVideos: 1,
-            resolution: '720p',
-            aspectRatio: '16:9' // Defaulting to landscape
-        }
-    });
-
-    // Poll for the result
-    while (!operation.done) {
-        // Wait for 10 seconds before polling again
-        await new Promise(resolve => setTimeout(resolve, 10000));
-        operation = await ai.operations.getVideosOperation({ operation: operation });
-    }
-
-    if (operation.error) {
-        console.error("Video generation operation failed:", operation.error);
-        throw new Error(`Video generation failed: ${operation.error.message}`);
-    }
-
-    const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-
-    if (!downloadLink) {
-        console.error("Video generation finished but no download link was provided. Full response:", operation.response);
-        throw new Error("Video generation failed to return a download link.");
-    }
-    
-    // Fetch the video MP4 bytes and create a blob URL
-    const videoResponse = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
-    
-    if (!videoResponse.ok) {
-        const errorBody = await videoResponse.text();
-        console.error("Failed to download video from URI.", { status: videoResponse.status, body: errorBody });
-        // A common error is "Requested entity was not found," which can indicate an issue with the
-        // project setup (e.g., billing not enabled or API not enabled).
-        if (errorBody.includes("Requested entity was not found")) {
-            throw new Error("API request failed: 'Requested entity was not found'. This may be due to an incorrect project configuration. Please ensure billing is enabled and the 'Generative Language API' is active for your project.");
-        }
-        throw new Error(`Failed to download the generated video. Status: ${videoResponse.status}`);
-    }
-    
-    const videoBlob = await videoResponse.blob();
-    return URL.createObjectURL(videoBlob);
-};
-
 export const generateSpeech = async (text: string, voiceName: string): Promise<string> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
@@ -303,4 +243,52 @@ export const generateSpeech = async (text: string, voiceName: string): Promise<s
         return URL.createObjectURL(blob);
     }
     throw new Error("Speech generation failed to return audio data.");
+};
+
+// FIX: Add missing generateVideoFromImage function.
+export const generateVideoFromImage = async (prompt: string, imagePart: Part): Promise<string> => {
+    // A new GoogleGenAI instance is needed for each call to ensure the latest API key is used,
+    // especially after the user selects one via the dialog.
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+    if (!imagePart.inlineData) {
+        throw new Error("Invalid image part provided for video generation.");
+    }
+    
+    let operation = await ai.models.generateVideos({
+        model: 'veo-3.1-fast-generate-preview',
+        prompt: prompt,
+        image: {
+            imageBytes: imagePart.inlineData.data,
+            mimeType: imagePart.inlineData.mimeType,
+        },
+        config: {
+            numberOfVideos: 1,
+            resolution: '720p',
+            aspectRatio: '16:9' // Default to landscape
+        }
+    });
+
+    while (!operation.done) {
+        await new Promise(resolve => setTimeout(resolve, 10000)); // Poll every 10 seconds
+        operation = await ai.operations.getVideosOperation({ operation });
+    }
+
+    const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
+
+    if (!downloadLink) {
+        console.error("Video generation failed. Full API response:", JSON.stringify(operation, null, 2));
+        throw new Error("Video generation failed to return a download link.");
+    }
+
+    // Fetch the video data and return an object URL
+    const response = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
+    
+    if (!response.ok) {
+        const errorBody = await response.text();
+        console.error("Failed to fetch video. Status:", response.status, "Body:", errorBody);
+        throw new Error(`Failed to fetch video data: ${response.statusText}`);
+    }
+    const blob = await response.blob();
+    return URL.createObjectURL(blob);
 };
