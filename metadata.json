@@ -1,0 +1,7 @@
+{
+  "name": "Hubie Ai Story Generator",
+  "description": "An AI-powered creative partner that takes your initial idea and automatically develops a story, plans the project, and generates all the necessary visual and audio assets to bring your vision to life as a complete digital storyboard.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
