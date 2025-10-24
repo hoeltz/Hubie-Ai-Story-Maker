@@ -74,7 +74,7 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ scenes, onClose }) =>
       <div className="relative w-full max-w-4xl aspect-video bg-black rounded-lg shadow-2xl overflow-hidden">
         <img
           key={currentScene.scene}
-// FIX: The 'GeneratedAsset' type does not have 'animationUrl'. Use 'imageUrl' instead.
+          // FIX: The 'GeneratedAsset' type does not have 'animationUrl'. Use 'imageUrl' instead.
           src={currentScene.imageUrl || ''}
           className="w-full h-full object-contain"
         />

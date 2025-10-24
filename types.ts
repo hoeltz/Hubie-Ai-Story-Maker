@@ -15,6 +15,4 @@ export interface GeneratedAsset {
   imagePrompt: string;
   imageUrl: string | null;
   audioUrl: string | null;
-  videoPrompt?: string | null;
-  videoPromptStatus?: 'idle' | 'generating' | 'done' | 'error';
 }

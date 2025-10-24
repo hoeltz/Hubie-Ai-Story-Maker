@@ -1,11 +1,14 @@
 
 
-import React, { useState, useEffect, useCallback } from 'react';
+
+import React, { useState, useEffect } from 'react';
+// FIX: The component was trying to import a function that didn't exist. This will be created in geminiService.
 import { generateVideoFromImage, fileToGenerativePart } from '../services/geminiService';
 import Spinner from './Spinner';
-import ApiKeySelector from './ApiKeySelector';
 import { UploadIcon } from './icons/UploadIcon';
 import { VideoIcon } from './icons/VideoIcon';
+// FIX: Import ApiKeySelector to handle mandatory API key selection for video models.
+import ApiKeySelector from './ApiKeySelector';
 
 const POLLING_MESSAGES = [
   "Warming up the digital director's chair...",
@@ -18,7 +21,6 @@ const POLLING_MESSAGES = [
 ];
 
 const ImageToVideo: React.FC = () => {
-  const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [prompt, setPrompt] = useState<string>('Animate this image with subtle motion, like a gentle breeze.');
@@ -26,21 +28,11 @@ const ImageToVideo: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [pollingMessage, setPollingMessage] = useState(POLLING_MESSAGES[0]);
-  // FIX: Add state to track API key-specific errors.
+
+  // FIX: Added state management for API key selection, which is required for Veo models.
+  const [apiKeySelected, setApiKeySelected] = useState(false);
+  const [isCheckingApiKey, setIsCheckingApiKey] = useState(true);
   const [apiKeyError, setApiKeyError] = useState(false);
-
-  const checkApiKey = useCallback(async () => {
-    if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
-      const keyStatus = await window.aistudio.hasSelectedApiKey();
-      setHasApiKey(keyStatus);
-    } else {
-      setHasApiKey(false); // Fallback if aistudio is not available
-    }
-  }, []);
-
-  useEffect(() => {
-    checkApiKey();
-  }, [checkApiKey]);
 
   useEffect(() => {
     let interval: number;
@@ -55,6 +47,19 @@ const ImageToVideo: React.FC = () => {
     }
     return () => clearInterval(interval);
   }, [isLoading]);
+
+  // FIX: Added effect to check for a pre-selected API key on component mount.
+  useEffect(() => {
+    const checkApiKey = async () => {
+      if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
+        const hasKey = await window.aistudio.hasSelectedApiKey();
+        setApiKeySelected(hasKey);
+      }
+      setIsCheckingApiKey(false);
+    };
+    checkApiKey();
+  }, []);
+
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -78,7 +83,6 @@ const ImageToVideo: React.FC = () => {
     setIsLoading(true);
     setError(null);
     setVideoUrl(null);
-    setApiKeyError(false);
     setPollingMessage(POLLING_MESSAGES[0]);
     try {
       const imagePart = await fileToGenerativePart(imageFile);
@@ -86,31 +90,40 @@ const ImageToVideo: React.FC = () => {
       setVideoUrl(resultUrl);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
-      setError(errorMessage);
-      console.error(err);
+      // FIX: Handle the specific "not found" error to re-prompt for API key setup.
       if (errorMessage.includes("Requested entity was not found")) {
-        setError("API Key validation failed. Please re-select your API key.");
-        setHasApiKey(false);
         setApiKeyError(true);
+        setApiKeySelected(false);
+      } else {
+        setError(errorMessage);
       }
+      console.error(err);
     } finally {
       setIsLoading(false);
     }
   };
-
-  if (hasApiKey === null) {
-    return <div className="flex items-center justify-center h-full"><Spinner /></div>;
+  
+  // FIX: Render loading state while checking for the API key.
+  if (isCheckingApiKey) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full">
+        <Spinner />
+        <p className="mt-4 text-gray-400">Checking API Key status...</p>
+      </div>
+    );
   }
 
-  if (!hasApiKey) {
-    // FIX: Pass the isErrorState prop to ApiKeySelector and handle state reset.
-    return <ApiKeySelector
-      isErrorState={apiKeyError}
-      onKeySelected={() => {
-        setHasApiKey(true);
-        setApiKeyError(false);
-      }}
-    />;
+  // FIX: Render the ApiKeySelector component if no key has been selected.
+  if (!apiKeySelected) {
+    return (
+      <ApiKeySelector
+        onKeySelected={() => {
+          setApiKeySelected(true);
+          setApiKeyError(false);
+        }}
+        isErrorState={apiKeyError}
+      />
+    );
   }
 
   return (

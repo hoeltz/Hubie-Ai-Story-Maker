@@ -218,28 +218,66 @@ export const generateTextFromImage = async (prompt: string, image: Part): Promis
     return response.text;
 };
 
-export const generatePromptFromImage = async (imageUrl: string): Promise<string> => {
+// FIX: Added 'generateVideoFromImage' function to support the Image-to-Video feature.
+export const generateVideoFromImage = async (prompt: string, image: Part): Promise<string> => {
+    // Per Veo guidelines, create a new instance right before the API call
+    // to ensure the latest API key from the selection dialog is used.
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
-    const match = imageUrl.match(/^data:(image\/[a-z]+);base64,(.*)$/);
-    if (!match) {
-        throw new Error("Invalid image data URL format.");
+    if (!image.inlineData) {
+        throw new Error("Invalid image part provided for video generation.");
     }
-    const mimeType = match[1];
-    const base64Data = match[2];
 
-    const imagePart: Part = {
-      inlineData: {
-        data: base64Data,
-        mimeType: mimeType,
-      },
+    const imagePayload = {
+        imageBytes: image.inlineData.data,
+        mimeType: image.inlineData.mimeType,
     };
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: { parts: [imagePart, { text: "Analyze this image in extreme detail. Generate a rich, descriptive prompt that another AI could use to recreate this image. The prompt should capture the art style, subject matter, composition, color palette, lighting, mood, and any specific details. Be comprehensive." }] },
+    let operation = await ai.models.generateVideos({
+        model: 'veo-3.1-fast-generate-preview',
+        prompt: prompt,
+        image: imagePayload,
+        config: {
+            numberOfVideos: 1,
+            resolution: '720p',
+            aspectRatio: '16:9' // Defaulting to landscape
+        }
     });
-    return response.text;
+
+    // Poll for the result
+    while (!operation.done) {
+        // Wait for 10 seconds before polling again
+        await new Promise(resolve => setTimeout(resolve, 10000));
+        operation = await ai.operations.getVideosOperation({ operation: operation });
+    }
+
+    if (operation.error) {
+        console.error("Video generation operation failed:", operation.error);
+        throw new Error(`Video generation failed: ${operation.error.message}`);
+    }
+
+    const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
+
+    if (!downloadLink) {
+        console.error("Video generation finished but no download link was provided. Full response:", operation.response);
+        throw new Error("Video generation failed to return a download link.");
+    }
+    
+    // Fetch the video MP4 bytes and create a blob URL
+    const videoResponse = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
+    
+    if (!videoResponse.ok) {
+        const errorBody = await videoResponse.text();
+        console.error("Failed to download video from URI.", { status: videoResponse.status, body: errorBody });
+        // This is a key part of the error handling for API key setup issues
+        if (errorBody.includes("Requested entity was not found")) {
+            throw new Error("Requested entity was not found. This often means the Google Cloud project is not configured correctly. Please ensure billing is enabled and the 'Generative Language API' is active for your project.");
+        }
+        throw new Error(`Failed to download the generated video. Status: ${videoResponse.status}`);
+    }
+    
+    const videoBlob = await videoResponse.blob();
+    return URL.createObjectURL(videoBlob);
 };
 
 export const generateSpeech = async (text: string, voiceName: string): Promise<string> => {
@@ -266,44 +304,3 @@ export const generateSpeech = async (text: string, voiceName: string): Promise<s
     }
     throw new Error("Speech generation failed to return audio data.");
 };
-
-export const generateVideoFromImage = async (prompt: string, image: Part): Promise<string> => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
-    if (!image.inlineData) {
-      throw new Error("Invalid image part for video generation.");
-    }
-  
-    let operation = await ai.models.generateVideos({
-      model: 'veo-3.1-fast-generate-preview',
-      prompt: prompt,
-      image: {
-        imageBytes: image.inlineData.data,
-        mimeType: image.inlineData.mimeType,
-      },
-      config: {
-        numberOfVideos: 1,
-        resolution: '720p',
-        aspectRatio: '16:9'
-      }
-    });
-  
-    while (!operation.done) {
-      await new Promise(resolve => setTimeout(resolve, 10000));
-      operation = await ai.operations.getVideosOperation({ operation: operation });
-    }
-  
-    const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-    if (!downloadLink) {
-      throw new Error("Video generation did not return a download link.");
-    }
-    
-    const response = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
-    if (!response.ok) {
-      const errorBody = await response.text();
-      console.error("Failed to download video:", errorBody);
-      throw new Error(`Failed to download the generated video. Status: ${response.status}`);
-    }
-    const videoBlob = await response.blob();
-    return URL.createObjectURL(videoBlob);
-  };

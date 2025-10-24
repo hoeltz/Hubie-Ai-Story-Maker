@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { GeneratedAsset } from '../types';
 import Spinner from './Spinner';
-import { ClipboardIcon } from './icons/ClipboardIcon';
 import { DownloadIcon } from './icons/DownloadIcon';
 import { MicrophoneIcon } from './icons/MicrophoneIcon';
 import { StopIcon } from './icons/StopIcon';
@@ -20,13 +19,11 @@ interface SceneCardProps {
   voiceOption: 'ai' | 'user';
   generationProgress?: GenerationProgress;
   onAudioRecorded: (audioUrl: string) => void;
-  onGenerateVideoPrompt: () => void;
   onToggleEdit: () => void;
   onUpdateScene: (sceneId: number, newNarration: string, newImagePrompt: string) => void;
 }
 
-const SceneCard: React.FC<SceneCardProps> = ({ asset, isEditing, voiceOption, generationProgress, onAudioRecorded, onGenerateVideoPrompt, onToggleEdit, onUpdateScene }) => {
-  const [copied, setCopied] = useState(false);
+const SceneCard: React.FC<SceneCardProps> = ({ asset, isEditing, voiceOption, generationProgress, onAudioRecorded, onToggleEdit, onUpdateScene }) => {
   const [isDownloadMenuOpen, setIsDownloadMenuOpen] = useState(false);
   const downloadMenuRef = useRef<HTMLDivElement>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -99,28 +96,6 @@ const SceneCard: React.FC<SceneCardProps> = ({ asset, isEditing, voiceOption, ge
         setIsSuggesting(false);
     }
   }
-
-  const handleCopy = () => {
-    if (asset.videoPrompt) {
-        navigator.clipboard.writeText(asset.videoPrompt);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    }
-  }
-
-  const handleDownloadPrompt = () => {
-    if (!asset.videoPrompt) return;
-    const blob = new Blob([asset.videoPrompt], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `scene_${asset.scene}_prompt.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    setIsDownloadMenuOpen(false);
-  };
   
   const renderMedia = () => {
     const isImageLoading = generationProgress?.image === 'generating' || generationProgress?.image === 'pending';
@@ -183,19 +158,6 @@ const SceneCard: React.FC<SceneCardProps> = ({ asset, isEditing, voiceOption, ge
         </div>
     );
   }
-  
-  const getButtonContent = () => {
-    switch (asset.videoPromptStatus) {
-        case 'generating':
-            return <><Spinner className="w-4 h-4" /> Generating...</>;
-        case 'done':
-            return '✓ Prompt Generated';
-        case 'error':
-            return <>Retry Prompt Generation</>;
-        default:
-            return <><ClipboardIcon className="w-4 h-4" /> Generate Video Prompt</>;
-    }
-  };
 
   const renderViewMode = () => (
     <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden shadow-lg flex flex-col h-full">
@@ -230,11 +192,6 @@ const SceneCard: React.FC<SceneCardProps> = ({ asset, isEditing, voiceOption, ge
                                 Audio (.wav)
                             </a>
                         </li>
-                         <li>
-                            <button onClick={handleDownloadPrompt} disabled={!asset.videoPrompt} className={`flex items-center gap-2 w-full text-left px-4 py-2 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed`}>
-                                Prompt (.txt)
-                            </button>
-                        </li>
                     </ul>
                 </div>
             )}
@@ -246,29 +203,6 @@ const SceneCard: React.FC<SceneCardProps> = ({ asset, isEditing, voiceOption, ge
         <p className="text-gray-300 text-sm flex-grow mb-4">{asset.narration}</p>
         
         {renderAudioContent()}
-
-        <div className="mt-4 space-y-2">
-            {asset.videoPromptStatus === 'done' && asset.videoPrompt ? (
-                <div className="relative">
-                    <textarea 
-                        readOnly
-                        value={asset.videoPrompt}
-                        className="w-full h-24 p-2 text-xs bg-gray-900 border border-gray-600 rounded-md resize-none"
-                    />
-                    <button onClick={handleCopy} className="absolute top-2 right-2 p-1 bg-gray-700 hover:bg-gray-600 rounded">
-                        {copied ? <span className="text-xs text-green-400">Copied!</span> : <ClipboardIcon className="w-4 h-4 text-gray-300"/>}
-                    </button>
-                </div>
-            ) : (
-                 <button
-                    onClick={onGenerateVideoPrompt}
-                    disabled={!asset.imageUrl || asset.videoPromptStatus === 'generating' || asset.videoPromptStatus === 'done'}
-                    className="w-full flex items-center justify-center gap-2 bg-purple-600 text-white text-sm font-bold py-2 px-3 rounded-lg hover:bg-purple-700 disabled:bg-purple-900/50 disabled:cursor-not-allowed transition-colors duration-300"
-                >
-                    {getButtonContent()}
-                </button>
-            )}
-        </div>
       </div>
     </div>
   );
