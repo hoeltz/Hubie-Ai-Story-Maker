@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { generateProjectPlan, generateImage, generateSpeech, continueProjectPlan, generateConclusion, AVAILABLE_VOICES } from '../services/geminiService';
 import Spinner from './Spinner';
 import SceneCard from './SceneCard';
+import StoryPlayer from './StoryPlayer';
 import { SparklesIcon } from './icons/SparklesIcon';
 import { BookOpenIcon } from './icons/BookOpenIcon';
 import { CheckCircleIcon } from './icons/CheckCircleIcon';
 import { DownloadIcon } from './icons/DownloadIcon';
+import { PlayIcon } from './icons/PlayIcon';
 import { ProjectPlan, GeneratedAsset, Scene } from '../types';
 
 declare const JSZip: any;
@@ -36,6 +38,7 @@ const StoryGenerator: React.FC = () => {
   const [voiceOption, setVoiceOption] = useState<VoiceOption>('ai');
   const [selectedAiVoice, setSelectedAiVoice] = useState<string>(AVAILABLE_VOICES[0].id);
   const [editingSceneId, setEditingSceneId] = useState<number | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
 
 
   const updateAsset = (sceneNumber: number, updates: Partial<GeneratedAsset>) => {
@@ -438,13 +441,20 @@ const StoryGenerator: React.FC = () => {
 
                  <div className="mt-6 border-t border-gray-700 pt-6">
                     <h3 className="text-xl font-semibold text-center mb-4">Project Tools</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 text-sm md:text-base">
+                      <button
+                        onClick={() => setIsPlaying(true)}
+                        disabled={generatedAssets.length === 0 || generatedAssets.some(a => !a.imageUrl || !a.audioUrl)}
+                        className="w-full flex items-center justify-center gap-2 bg-purple-600 font-bold py-3 px-4 rounded-lg hover:bg-purple-700 disabled:bg-purple-900/50 disabled:cursor-not-allowed"
+                        >
+                        <PlayIcon className="w-5 h-5"/> Play Story
+                      </button>
                       <button 
                           onClick={handleContinueStory}
                           disabled={isContinuing || isFinalizing || !!conclusion}
                           className="w-full flex items-center justify-center gap-2 bg-indigo-600 font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 disabled:bg-indigo-900/50 disabled:cursor-not-allowed"
                       >
-                          {isContinuing ? <><Spinner /> Continuing...</> : <><BookOpenIcon className="w-5 h-5"/> Continue Story</>}
+                          {isContinuing ? <><Spinner /> Continuing...</> : <><BookOpenIcon className="w-5 h-5"/> Continue</>}
                       </button>
                       
                       <button 
@@ -452,9 +462,9 @@ const StoryGenerator: React.FC = () => {
                           disabled={isFinalizing || !!conclusion}
                           className="w-full flex items-center justify-center gap-2 bg-green-600 font-bold py-3 px-4 rounded-lg hover:bg-green-700 disabled:bg-green-900/50 disabled:cursor-not-allowed"
                       >
-                         {isFinalizing ? <><Spinner /> Finalizing...</> : <><CheckCircleIcon className="w-5 h-5"/> Finalize Story</>}
+                         {isFinalizing ? <><Spinner /> Finalizing...</> : <><CheckCircleIcon className="w-5 h-5"/> Finalize</>}
                       </button>
-                      <button onClick={handleStartOver} className="w-full bg-gray-600 font-bold py-3 px-4 rounded-lg hover:bg-gray-700 md:col-start-3">Start Over</button>
+                      <button onClick={handleStartOver} className="w-full bg-gray-600 font-bold py-3 px-4 rounded-lg hover:bg-gray-700">Start Over</button>
                     </div>
                     
                     <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
@@ -487,6 +497,12 @@ const StoryGenerator: React.FC = () => {
 
   return (
     <div>
+        {isPlaying && generatedAssets.length > 0 && (
+            <StoryPlayer
+                scenes={generatedAssets.filter(a => a.imageUrl && a.audioUrl).sort((a,b) => a.scene - b.scene)}
+                onClose={() => setIsPlaying(false)}
+            />
+        )}
         {renderContent()}
     </div>
   );

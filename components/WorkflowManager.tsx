@@ -1,75 +1,22 @@
-
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import TabButton from './TabButton';
 import StoryGenerator from './StoryGenerator';
 import ImageToText from './ImageToText';
 import TextToVoice from './TextToVoice';
-// FIX: Import ImageToVideo, ApiKeySelector, and VideoIcon to integrate the new feature.
-import ImageToVideo from './ImageToVideo';
-import ApiKeySelector from './ApiKeySelector';
 import { BookOpenIcon } from './icons/BookOpenIcon';
 import { EyeIcon } from './icons/EyeIcon';
 import { VolumeIcon } from './icons/VolumeIcon';
-import { VideoIcon } from './icons/VideoIcon';
 
-// FIX: Add 'video' to the Tab type definition.
-type Tab = 'story' | 'image' | 'voice' | 'video';
+type Tab = 'story' | 'image' | 'voice';
 
-// FIX: Add the new 'Image to Video' tab configuration.
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'story', label: 'Story Generator', icon: <BookOpenIcon className="w-5 h-5"/> },
     { id: 'image', label: 'Image to Text', icon: <EyeIcon className="w-5 h-5" /> },
     { id: 'voice', label: 'Text to Voice', icon: <VolumeIcon className="w-5 h-5" /> },
-    { id: 'video', label: 'Image to Video', icon: <VideoIcon className="w-5 h-5" /> },
 ];
-
-// FIX: The error "Subsequent property declarations must have the same type" indicates a conflict
-// between multiple declarations of `window.aistudio`. Using a named interface `AIStudio`
-// instead of an anonymous type allows TypeScript to correctly merge the declarations.
-interface AIStudio {
-  hasSelectedApiKey: () => Promise<boolean>;
-  openSelectKey: () => Promise<void>;
-}
-
-// Add type definition for aistudio to avoid TypeScript errors.
-declare global {
-  interface Window {
-    aistudio?: AIStudio;
-  }
-}
 
 const WorkflowManager: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('story');
-  // FIX: Add state to manage the API key requirement for the video feature.
-  const [hasApiKeyForVideo, setHasApiKeyForVideo] = useState<boolean>(false);
-  const [apiKeyError, setApiKeyError] = useState<boolean>(false);
-
-  // FIX: Add an effect to check for the API key when the video tab is selected.
-  useEffect(() => {
-    const checkApiKey = async () => {
-        if (activeTab === 'video') {
-            if (window.aistudio && await window.aistudio.hasSelectedApiKey()) {
-                setHasApiKeyForVideo(true);
-                setApiKeyError(false); // Reset error state on successful check
-            } else {
-                setHasApiKeyForVideo(false);
-            }
-        }
-    };
-    checkApiKey();
-  }, [activeTab]);
-  
-  const handleKeySelected = () => {
-    // Assume selection was successful. A failed API call will trigger the error state.
-    setHasApiKeyForVideo(true);
-    setApiKeyError(false);
-  };
-  
-  const handleApiKeyError = () => {
-    setHasApiKeyForVideo(false);
-    setApiKeyError(true);
-  };
 
   const renderActiveTab = () => {
     switch (activeTab) {
@@ -79,12 +26,6 @@ const WorkflowManager: React.FC = () => {
         return <ImageToText />;
       case 'voice':
         return <TextToVoice />;
-      // FIX: Add rendering logic for the new video tab, including the API key check.
-      case 'video':
-        if (!hasApiKeyForVideo) {
-          return <ApiKeySelector onKeySelected={handleKeySelected} isErrorState={apiKeyError} />;
-        }
-        return <ImageToVideo onApiKeyError={handleApiKeyError} />;
       default:
         return null;
     }
